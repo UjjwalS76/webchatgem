@@ -1,17 +1,12 @@
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-
 import streamlit as st
-# ... rest of your codeimport streamlit as st
-from langchain_community.vectorstores import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_community.document_loaders import WebBaseLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 from langchain_core.prompts import PromptTemplate, ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
+from langchain_community.vectorstores import FAISS
+import os
 
 # Function to load and split website data
 def website_loader(url):
@@ -21,7 +16,7 @@ def website_loader(url):
 
 # Function to set up the retrieval chain
 def setup_retrieval_chain(vectorstore):
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-002", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.2, convert_system_message_to_human=True)
+    llm = ChatGoogleGenerativeAI(model="gemini-pro", google_api_key=st.secrets["GOOGLE_API_KEY"], temperature=0.7, convert_system_message_to_human=True) # using gemini pro
 
     # set to optimize RAM usage
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
@@ -84,10 +79,18 @@ if st.button("Load Website Data"):
             website_data = website_loader(url)
             text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
             splits = text_splitter.split_documents(website_data)
-            embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=st.secrets["GOOGLE_API_KEY"])
-            vectorstore = Chroma.from_documents(splits, embeddings)
-            st.session_state.qa = setup_retrieval_chain(vectorstore)
+            embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=st.secrets["GOOGLE_API_KEY"]) # using google api key from st.secrets
+            vectorstore = FAISS.from_documents(splits, embeddings)
+
+            # Save the FAISS index to a file
+            faiss_file_path = os.path.join(os.getcwd(), "faiss_index")
+            vectorstore.save_local(faiss_file_path)
+
+            # Load the FAISS index from the file
+            loaded_vectorstore = FAISS.load_local(faiss_file_path, embeddings)
+            st.session_state.qa = setup_retrieval_chain(loaded_vectorstore)
             st.success("Website data loaded and processed!")
+
         except Exception as e:
             st.error(f"An error occurred: {e}")
 
