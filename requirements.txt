@@ -5,3 +5,4 @@ langchain-google-genai
 chromadb
 beautifulsoup4
 requests
+pysqlite3-binary
